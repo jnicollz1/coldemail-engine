@@ -254,6 +254,50 @@ alerts = monitor.check_campaign_health({
 # [{"level": "critical", "message": "High bounce rate (8.5%) - check list quality"}]
 ```
 
+## Instantly.ai Client
+
+Production-grade API client with automatic retries, rate limiting, and pagination.
+
+```python
+from instantly import InstantlyClient
+
+# Initialize from environment variable
+client = InstantlyClient.from_env()
+
+# Or with explicit key
+client = InstantlyClient(api_key="your-key")
+
+# Context manager for automatic cleanup
+with InstantlyClient.from_env() as client:
+    # Iterate over all campaigns (handles pagination automatically)
+    for campaign in client.iter_campaigns():
+        print(campaign["name"])
+
+    # Iterate over all leads in a campaign
+    for lead in client.iter_leads(campaign_id):
+        print(lead["email"])
+```
+
+**Features:**
+- Automatic retries with exponential backoff (429, 5xx, timeouts)
+- Respects `Retry-After` headers
+- Request timeouts (3s connect, 30s read)
+- Pagination iterators: `iter_campaigns()`, `iter_leads()`, `iter_replies()`
+- Structured logging via Python's `logging` module
+- Context manager support
+
+**CLI for testing:**
+```bash
+# Smoke test your API connection
+python instantly.py smoke-test
+
+# List campaigns
+python instantly.py list-campaigns
+
+# Check account health
+python instantly.py health -v
+```
+
 ## Setup
 
 ```bash
