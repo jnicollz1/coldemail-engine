@@ -1,0 +1,11 @@
+email,first_name,last_name,company,title,industry,company_size,linkedin_url
+sarah.chen@acmecorp.io,Sarah,Chen,Acme Corp,VP of Sales,SaaS,50-200,https://linkedin.com/in/sarahchen
+mike.rodriguez@techstart.co,Mike,Rodriguez,TechStart,Head of Revenue,Software,20-50,https://linkedin.com/in/mikerodriguez
+jennifer.wu@scaleup.com,Jennifer,Wu,ScaleUp Inc,Director of Sales,B2B SaaS,200-500,https://linkedin.com/in/jenniferwu
+david.kim@growthco.io,David,Kim,GrowthCo,VP Sales & Marketing,Technology,100-250,https://linkedin.com/in/davidkim
+rachel.patel@nextstage.com,Rachel,Patel,NextStage Ventures,CRO,Venture Capital,10-20,https://linkedin.com/in/rachelpatel
+chris.johnson@cloudbase.io,Chris,Johnson,CloudBase,Sales Director,Cloud Infrastructure,500-1000,https://linkedin.com/in/chrisjohnson
+amanda.foster@dataflow.co,Amanda,Foster,DataFlow Systems,Head of GTM,Data Analytics,50-100,https://linkedin.com/in/amandafoster
+brian.martinez@velocity.ai,Brian,Martinez,Velocity AI,VP of Revenue,AI/ML,30-75,https://linkedin.com/in/brianmartinez
+lisa.thompson@marketpro.com,Lisa,Thompson,MarketPro,Director of BD,Marketing Tech,150-300,https://linkedin.com/in/lisathompson
+kevin.nguyen@fintech.io,Kevin,Nguyen,FinTech Solutions,CRO,Financial Services,200-400,https://linkedin.com/in/kevinnguyen
