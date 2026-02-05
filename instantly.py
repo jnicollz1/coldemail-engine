@@ -11,10 +11,19 @@ Docs: https://developer.instantly.ai/
 """
 
 import requests
+import pandas as pd
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 from datetime import datetime
 import time
+
+
+class InstantlyAPIError(Exception):
+    """Raised when Instantly API returns an error."""
+    def __init__(self, message: str, status_code: Optional[int] = None):
+        self.message = message
+        self.status_code = status_code
+        super().__init__(self.message)
 
 
 @dataclass
@@ -45,19 +54,24 @@ class InstantlyClient:
         self._last_request_time = time.time()
     
     def _request(
-        self, 
-        method: str, 
-        endpoint: str, 
+        self,
+        method: str,
+        endpoint: str,
         params: Optional[Dict] = None,
         json_data: Optional[Dict] = None
     ) -> Dict:
-        """Make an API request with error handling."""
+        """
+        Make an API request with error handling.
+
+        Raises:
+            InstantlyAPIError: If the API returns an error response
+        """
         self._rate_limit()
-        
+
         url = f"{self.config.base_url}/{endpoint}"
         params = params or {}
         params["api_key"] = self.config.api_key
-        
+
         try:
             if method == "GET":
                 response = self.session.get(url, params=params)
@@ -65,14 +79,14 @@ class InstantlyClient:
                 response = self.session.post(url, params=params, json=json_data)
             else:
                 raise ValueError(f"Unsupported method: {method}")
-            
+
             response.raise_for_status()
             return response.json()
-            
+
         except requests.exceptions.HTTPError as e:
-            return {"error": str(e), "status_code": response.status_code}
+            raise InstantlyAPIError(str(e), status_code=response.status_code)
         except requests.exceptions.RequestException as e:
-            return {"error": str(e)}
+            raise InstantlyAPIError(str(e))
     
     # =========================================
     # Campaign Management
@@ -80,10 +94,12 @@ class InstantlyClient:
     
     def list_campaigns(self, skip: int = 0, limit: int = 100) -> List[Dict]:
         """List all campaigns."""
-        return self._request("GET", "campaign/list", params={
+        result = self._request("GET", "campaign/list", params={
             "skip": skip,
             "limit": limit
         })
+        # API returns list directly or wrapped in a key
+        return result if isinstance(result, list) else result.get("campaigns", [])
     
     def get_campaign(self, campaign_id: str) -> Dict:
         """Get campaign details."""
@@ -145,17 +161,18 @@ class InstantlyClient:
         })
     
     def list_leads(
-        self, 
-        campaign_id: str, 
-        skip: int = 0, 
+        self,
+        campaign_id: str,
+        skip: int = 0,
         limit: int = 100
     ) -> List[Dict]:
         """List leads in a campaign."""
-        return self._request("GET", "lead/list", params={
+        result = self._request("GET", "lead/list", params={
             "campaign_id": campaign_id,
             "skip": skip,
             "limit": limit
         })
+        return result if isinstance(result, list) else result.get("leads", [])
     
     # =========================================
     # Analytics / Engagement
@@ -173,19 +190,19 @@ class InstantlyClient:
         })
     
     def get_lead_activity(
-        self, 
+        self,
         campaign_id: str,
         email: Optional[str] = None,
         event_type: Optional[str] = None
     ) -> List[Dict]:
         """
         Get activity/events for leads.
-        
+
         Args:
             campaign_id: Campaign to query
             email: Optional filter by specific email
             event_type: Optional filter: 'sent', 'opened', 'replied', 'bounced'
-        
+
         Returns:
             List of activity events
         """
@@ -194,21 +211,23 @@ class InstantlyClient:
             params["email"] = email
         if event_type:
             params["event_type"] = event_type
-            
-        return self._request("GET", "lead/activity", params=params)
+
+        result = self._request("GET", "lead/activity", params=params)
+        return result if isinstance(result, list) else result.get("activities", [])
     
     def get_replies(
-        self, 
+        self,
         campaign_id: str,
         skip: int = 0,
         limit: int = 100
     ) -> List[Dict]:
         """Get all replies for a campaign."""
-        return self._request("GET", "campaign/replies", params={
+        result = self._request("GET", "campaign/replies", params={
             "campaign_id": campaign_id,
             "skip": skip,
             "limit": limit
         })
+        return result if isinstance(result, list) else result.get("replies", [])
     
     # =========================================
     # Email Account Management
@@ -216,7 +235,8 @@ class InstantlyClient:
     
     def list_accounts(self) -> List[Dict]:
         """List connected email accounts."""
-        return self._request("GET", "account/list")
+        result = self._request("GET", "account/list")
+        return result if isinstance(result, list) else result.get("accounts", [])
     
     def get_account_status(self, email: str) -> Dict:
         """Get warmup/sending status for an account."""
@@ -244,53 +264,56 @@ class InstantlySync:
         self._last_sync = {}
     
     def sync_campaign_results(
-        self, 
+        self,
         campaign_id: str,
         variant_mapping: Dict[str, str]
     ) -> Dict:
         """
         Pull engagement from Instantly and update A/B test stats.
-        
+
         Args:
             campaign_id: Instantly campaign ID
             variant_mapping: Dict mapping lead email -> variant_id
-        
+
         Returns:
             Sync summary with counts
+
+        Raises:
+            InstantlyAPIError: If API calls fail
         """
-        summary = {"opens_synced": 0, "replies_synced": 0}
-        
+        summary = {"opens_synced": 0, "replies_synced": 0, "errors": []}
+
         # Get opens
-        opens = self.instantly.get_lead_activity(
-            campaign_id, 
-            event_type="opened"
-        )
-        
-        for event in opens:
-            email = event.get("email")
-            if email in variant_mapping:
-                # Record open for this variant
-                # Note: would need send_id tracking for full implementation
-                summary["opens_synced"] += 1
-        
+        try:
+            opens = self.instantly.get_lead_activity(
+                campaign_id,
+                event_type="opened"
+            )
+            for event in opens:
+                email = event.get("email")
+                if email in variant_mapping:
+                    summary["opens_synced"] += 1
+        except InstantlyAPIError as e:
+            summary["errors"].append(f"Failed to fetch opens: {e.message}")
+
         # Get replies
-        replies = self.instantly.get_replies(campaign_id)
-        
-        for reply in replies:
-            email = reply.get("email")
-            if email in variant_mapping:
-                summary["replies_synced"] += 1
-        
+        try:
+            replies = self.instantly.get_replies(campaign_id)
+            for reply in replies:
+                email = reply.get("email")
+                if email in variant_mapping:
+                    summary["replies_synced"] += 1
+        except InstantlyAPIError as e:
+            summary["errors"].append(f"Failed to fetch replies: {e.message}")
+
         return summary
     
     def get_account_health(self) -> pd.DataFrame:
         """
         Get health status of all email accounts.
-        
+
         Returns DataFrame with warmup status, sending limits, etc.
         """
-        import pandas as pd
-        
         accounts = self.instantly.list_accounts()
         
         health_data = []
